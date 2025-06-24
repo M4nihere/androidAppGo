@@ -53,13 +53,13 @@ jobs:
         go-version: ${{ env.GO_VERSION }}
         
     - name: Set up Java
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '11'
         
     - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
+      uses: android-actions/setup-android@v4
       with:
         api-level: ${{ env.ANDROID_API_LEVEL }}
         target: google_apis
@@ -70,7 +70,7 @@ jobs:
         echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.NDK_VERSION }}" >> $GITHUB_ENV
         
     - name: Cache Go modules
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/go/pkg/mod
@@ -101,7 +101,7 @@ jobs:
         fi
         
     - name: Upload APK artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: mygoapp-${{ matrix.arch }}-apk
         path: mygoapp-${{ matrix.arch }}.apk
@@ -121,13 +121,13 @@ jobs:
         go-version: ${{ env.GO_VERSION }}
         
     - name: Set up Java
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '11'
         
     - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
+      uses: android-actions/setup-android@v4
       with:
         api-level: ${{ env.ANDROID_API_LEVEL }}
         target: google_apis
@@ -162,7 +162,7 @@ jobs:
         mv mygoapp-universal.apk mygoapp-v${{ steps.app_info.outputs.version }}-${{ steps.app_info.outputs.commit_sha }}.apk
         
     - name: Upload Universal APK artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: mygoapp-universal-apk
         path: mygoapp-v${{ steps.app_info.outputs.version }}-${{ steps.app_info.outputs.commit_sha }}.apk
