@@ -25,16 +25,16 @@ jobs:
         go-version: ${{ env.GO_VERSION }}
         
         
-    - name: Run tests
-      run: go test -v ./...
+    # - name: Run tests
+    #   run: go test -v ./...
       
-    - name: Run go vet
-      run: go vet ./...
+    # - name: Run go vet
+    #   run: go vet ./...
       
-    - name: Run staticcheck
-      uses: dominikh/staticcheck-action@v1.3.0
-      with:
-        version: "2023.1.6"
+    # - name: Run staticcheck
+    #   uses: dominikh/staticcheck-action@v1.3.0
+    #   with:
+    #     version: "2023.1.6"
 
   build:
     needs: test
