@@ -1,0 +1,201 @@
+name: Build Go Android App (Advanced)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ created ]
+
+env:
+  GO_VERSION: '1.21'
+  ANDROID_API_LEVEL: 33
+  NDK_VERSION: '25.1.8937393'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Run tests
+      run: go test -v ./...
+      
+    - name: Run go vet
+      run: go vet ./...
+      
+    - name: Run staticcheck
+      uses: dominikh/staticcheck-action@v1.3.0
+      with:
+        version: "2023.1.6"
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [arm, arm64, 386, amd64]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Set up Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '11'
+        
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        api-level: ${{ env.ANDROID_API_LEVEL }}
+        target: google_apis
+        
+    - name: Install Android NDK
+      run: |
+        echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;${{ env.NDK_VERSION }}"
+        echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.NDK_VERSION }}" >> $GITHUB_ENV
+        
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: ${{ runner.os }}-go-${{ matrix.arch }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ matrix.arch }}-
+          ${{ runner.os }}-go-
+          
+    - name: Install dependencies
+      run: go mod download
+      
+    - name: Install gomobile
+      run: |
+        go install golang.org/x/mobile/cmd/gomobile@latest
+        gomobile init
+        
+    - name: Build APK for ${{ matrix.arch }}
+      run: |
+        if [ "${{ matrix.arch }}" = "arm64" ]; then
+          GOARCH=arm64 gomobile build -target=android/arm64 -o mygoapp-${{ matrix.arch }}.apk .
+        elif [ "${{ matrix.arch }}" = "arm" ]; then
+          GOARCH=arm gomobile build -target=android/arm -o mygoapp-${{ matrix.arch }}.apk .
+        elif [ "${{ matrix.arch }}" = "386" ]; then
+          GOARCH=386 gomobile build -target=android/386 -o mygoapp-${{ matrix.arch }}.apk .
+        else
+          GOARCH=amd64 gomobile build -target=android/amd64 -o mygoapp-${{ matrix.arch }}.apk .
+        fi
+        
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: mygoapp-${{ matrix.arch }}-apk
+        path: mygoapp-${{ matrix.arch }}.apk
+        retention-days: 30
+
+  build-universal:
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Set up Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '11'
+        
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        api-level: ${{ env.ANDROID_API_LEVEL }}
+        target: google_apis
+        
+    - name: Install Android NDK
+      run: |
+        echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;${{ env.NDK_VERSION }}"
+        echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${{ env.NDK_VERSION }}" >> $GITHUB_ENV
+        
+    - name: Install dependencies
+      run: go mod download
+      
+    - name: Install gomobile
+      run: |
+        go install golang.org/x/mobile/cmd/gomobile@latest
+        gomobile init
+        
+    - name: Build Universal APK
+      run: |
+        # Build universal APK with all architectures
+        gomobile build -target=android -o mygoapp-universal.apk .
+        
+    - name: Get app info
+      id: app_info
+      run: |
+        echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+        echo "commit_sha=${GITHUB_SHA:0:8}" >> $GITHUB_OUTPUT
+        echo "version=$(git describe --tags --always)" >> $GITHUB_OUTPUT
+        
+    - name: Rename APK with version info
+      run: |
+        mv mygoapp-universal.apk mygoapp-v${{ steps.app_info.outputs.version }}-${{ steps.app_info.outputs.commit_sha }}.apk
+        
+    - name: Upload Universal APK artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: mygoapp-universal-apk
+        path: mygoapp-v${{ steps.app_info.outputs.version }}-${{ steps.app_info.outputs.commit_sha }}.apk
+        retention-days: 90
+        
+    - name: Create Release Notes
+      if: github.event_name == 'release'
+      run: |
+        cat > release_notes.md << EOF
+        # MyGoApp Release ${{ github.event.release.tag_name }}
+        
+        **Build Information:**
+        - Build Time: ${{ steps.app_info.outputs.build_time }}
+        - Commit: ${{ steps.app_info.outputs.commit_sha }}
+        - Go Version: ${{ env.GO_VERSION }}
+        - Android API Level: ${{ env.ANDROID_API_LEVEL }}
+        
+        **Features:**
+        - Interactive triangle graphics
+        - Touch-responsive movement
+        - Color-changing animations
+        - OpenGL hardware acceleration
+        
+        **Installation:**
+        Download the APK and install on your Android device (enable "Install from unknown sources").
+        EOF
+        
+    - name: Upload APK to Release
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./mygoapp-v${{ steps.app_info.outputs.version }}-${{ steps.app_info.outputs.commit_sha }}.apk
+        asset_name: mygoapp-${{ github.event.release.tag_name }}.apk
+        asset_content_type: application/vnd.android.package-archive
