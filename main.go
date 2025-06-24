@@ -1,11 +1,8 @@
 package main
 
 import (
-	"fmt"
-	"image/color"
 	"log"
 	"math"
-	"time"
 
 	"golang.org/x/mobile/app"
 	"golang.org/x/mobile/event/lifecycle"
