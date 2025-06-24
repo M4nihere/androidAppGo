@@ -124,7 +124,7 @@ jobs:
         java-version: '11'
         
     - name: Setup Android SDK
-      uses: android-actions/setup-android@v4
+      uses: android-actions/setup-android@v3
       with:
         api-level: ${{ env.ANDROID_API_LEVEL }}
         target: google_apis
